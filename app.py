@@ -4,7 +4,7 @@ import google.generativeai as genai
 # 1. PAGE CONFIGURATION
 st.set_page_config(page_title="Rich Klein Crisis Management", page_icon="🛡️", layout="wide")
 
-# 2. CUSTOM STYLING (CSS)
+# 2. CUSTOM STYLING (The "Pro" Look)
 st.markdown("""
 <style>
     .stApp { background-color: #0e1117; color: white; }
@@ -36,25 +36,35 @@ st.divider()
 # 6. CHAT INTERFACE
 st.markdown("### 🛡️ Start Consultation")
 
-system_instruction = "You are Rich Klein, a Crisis Communications expert. Professional, calm, strategic, and direct."
-model = genai.GenerativeModel(model_name="gemini-1.5-flash", system_instruction=system_instruction)
+# We use 'gemini-pro' here which is the most reliable standard model
+model = genai.GenerativeModel('gemini-pro')
 
+# Initialize chat history with a hidden instruction to set the Persona
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = [
+        {"role": "user", "content": "System Instruction: You are Rich Klein, a Crisis Communications expert. Be professional, calm, strategic, and direct. Keep answers concise."},
+        {"role": "model", "content": "Understood. I am ready to assist as Rich Klein."}
+    ]
 
-for message in st.session_state.messages:
+# Display history (skip the first two hidden system messages so the user doesn't see them)
+for message in st.session_state.messages[2:]:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
 if prompt := st.chat_input("Describe your crisis situation here..."):
+    # Display user message
     st.chat_message("user").markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
     
     try:
+        # Generate response
         chat = model.start_chat(history=[{"role": m["role"], "parts": [m["content"]]} for m in st.session_state.messages])
         response = chat.send_message(prompt)
+        
+        # Display assistant response
         with st.chat_message("assistant"):
             st.markdown(response.text)
         st.session_state.messages.append({"role": "model", "content": response.text})
+        
     except Exception as e:
         st.error(f"Error: {e}")
