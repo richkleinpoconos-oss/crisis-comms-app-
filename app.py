@@ -34,10 +34,10 @@ with col3: st.success("**Proven Results**\n\n30+ years of agency experience")
 st.divider()
 
 # 6. CHAT INTERFACE
-st.markdown("### 🛡️ Start Consultation (Text Mode)")
+st.markdown("### 🛡️ Start Consultation")
 
-# *** FIX: Using 'gemini-pro' to prevent 404 error ***
-model = genai.GenerativeModel('gemini-pro')
+# *** FIX: Using the correct model for the new library ***
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -51,15 +51,10 @@ if prompt := st.chat_input("Describe your crisis situation here..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     
     try:
-        # Create chat history for the API
-        history = [{"role": m["role"], "parts": [m["content"]]} for m in st.session_state.messages]
-        chat = model.start_chat(history=history)
-        
+        chat = model.start_chat(history=[{"role": m["role"], "parts": [m["content"]]} for m in st.session_state.messages])
         response = chat.send_message(prompt)
-        
         with st.chat_message("assistant"):
             st.markdown(response.text)
         st.session_state.messages.append({"role": "model", "content": response.text})
-        
     except Exception as e:
         st.error(f"Error: {e}")
