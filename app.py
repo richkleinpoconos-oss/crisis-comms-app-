@@ -1,24 +1,42 @@
 import streamlit as st
 import google.generativeai as genai
 
-st.set_page_config(page_title="Crisis Comms Assistant", page_icon="🛡️")
-st.title("Crisis Communications Manager 🛡️")
+# 1. PAGE CONFIGURATION
+st.set_page_config(page_title="Rich Klein Crisis Management", page_icon="🛡️", layout="wide")
 
-# GET API KEY
+# 2. CUSTOM STYLING (CSS)
+st.markdown("""
+<style>
+    .stApp { background-color: #0e1117; color: white; }
+    h1 { text-align: center; font-size: 3.5rem !important; font-weight: 800 !important; margin-bottom: 0px; }
+    .subtitle { text-align: center; font-size: 1.2rem; color: #b0b0b0; margin-bottom: 40px; }
+    .highlight { color: #4da6ff; }
+</style>
+""", unsafe_allow_html=True)
+
+# 3. API SETUP
 if "GOOGLE_API_KEY" in st.secrets:
-    api_key = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_key=api_key)
+    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
-    st.error("Missing API Key. Please add it to Streamlit Secrets.")
+    st.error("Missing API Key.")
     st.stop()
 
-# YOUR INSTRUCTIONS
-system_instruction = """
-You are a Crisis Communications expert. 
-Your goal is to protect the client's brand and mitigate negative press.
-You are professional, calm, and strategic.
-"""
+# 4. HERO SECTION
+st.markdown("<h1>Protect your reputation<br><span class='highlight'>when it matters most.</span></h1>", unsafe_allow_html=True)
+st.markdown("<div class='subtitle'>Experience immediate strategic guidance trained on Rich Klein's expertise.</div>", unsafe_allow_html=True)
 
+# 5. INFO CARDS
+st.divider()
+col1, col2, col3 = st.columns(3)
+with col1: st.info("**Global Support**\n\nU.S. and Italy based insights")
+with col2: st.info("**Instant Strategy**\n\nImmediate crisis response steps")
+with col3: st.success("**Proven Results**\n\n30+ years of agency experience")
+st.divider()
+
+# 6. CHAT INTERFACE
+st.markdown("### 🛡️ Start Consultation")
+
+system_instruction = "You are Rich Klein, a Crisis Communications expert. Professional, calm, strategic, and direct."
 model = genai.GenerativeModel(model_name="gemini-1.5-flash", system_instruction=system_instruction)
 
 if "messages" not in st.session_state:
@@ -28,7 +46,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if prompt := st.chat_input("Enter crisis details here..."):
+if prompt := st.chat_input("Describe your crisis situation here..."):
     st.chat_message("user").markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
     
