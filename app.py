@@ -21,31 +21,44 @@ else:
     st.error("Missing API Key.")
     st.stop()
 
-# 4. AUTO-DETECT WORKING MODEL (The "Universal Key")
+# 4. THE RICH KLEIN "BRAIN" INSTRUCTIONS
+system_instruction = """
+You are Rich Klein, a veteran Crisis Communications consultant with over 30 years of experience.
+You run "Rich Klein Crisis Management," operating in both the United States (Pennsylvania) and Italy (Parma).
+
+YOUR ROLE:
+- You provide immediate, strategic advice to protect a client's reputation.
+- You are calm, direct, and authoritative.
+- You specialize in legal PR, media relations, and reputation management.
+
+HOW YOU SPEAK:
+- Do not speak like a generic AI. Speak like a senior consultant.
+- Be concise. Get straight to the strategy.
+- If asked "Who are you?", introduce yourself as Rich Klein, the crisis expert.
+"""
+
+# 5. CONNECT TO THE BEST AVAILABLE MODEL
 try:
     # We ask Google: "Give me a list of all models I am allowed to use."
     all_models = list(genai.list_models())
-    
-    # We filter for models that can chat (generateContent)
     valid_models = [m.name for m in all_models if 'generateContent' in m.supported_generation_methods]
     
     if valid_models:
-        # We pick the first valid one found (e.g., 'models/gemini-pro' or 'models/gemini-1.5-flash')
+        # Use the first working model found, BUT attach the "Rich Klein" instructions to it
         my_model_name = valid_models[0]
-        model = genai.GenerativeModel(my_model_name)
+        model = genai.GenerativeModel(my_model_name, system_instruction=system_instruction)
     else:
-        st.error("CRITICAL ERROR: Your API Key connects, but no AI models are enabled on your Google account.")
+        st.error("Error: No AI models found on this account.")
         st.stop()
-        
 except Exception as e:
     st.error(f"Connection Error: {e}")
     st.stop()
 
-# 5. HERO SECTION
+# 6. HERO SECTION
 st.markdown("<h1>Protect your reputation<br><span class='highlight'>when it matters most.</span></h1>", unsafe_allow_html=True)
 st.markdown("<div class='subtitle'>Experience immediate strategic guidance trained on Rich Klein's expertise.</div>", unsafe_allow_html=True)
 
-# 6. INFO CARDS
+# 7. INFO CARDS
 st.divider()
 col1, col2, col3 = st.columns(3)
 with col1: st.info("**Global Support**\n\nU.S. and Italy based insights")
@@ -53,7 +66,7 @@ with col2: st.info("**Instant Strategy**\n\nImmediate crisis response steps")
 with col3: st.success("**Proven Results**\n\n30+ years of agency experience")
 st.divider()
 
-# 7. CHAT INTERFACE
+# 8. CHAT INTERFACE
 st.markdown("### 🛡️ Start Consultation")
 
 if "messages" not in st.session_state:
@@ -79,4 +92,4 @@ if prompt := st.chat_input("Describe your crisis situation here..."):
         st.session_state.messages.append({"role": "model", "content": response.text})
         
     except Exception as e:
-        st.error(f"Error details: {e}")
+        st.error(f"Error: {e}")
