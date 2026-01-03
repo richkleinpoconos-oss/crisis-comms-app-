@@ -14,45 +14,26 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. API SETUP
+# 3. SIDEBAR (RESET BUTTON)
+with st.sidebar:
+    st.header("Control Panel")
+    if st.button("🔄 Reset Conversation", type="primary"):
+        st.session_state.messages = []
+        st.rerun()
+
+# 4. API SETUP
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
     st.error("Missing API Key.")
     st.stop()
 
-# 4. THE RICH KLEIN "BRAIN" INSTRUCTIONS
-system_instruction = """
-You are Rich Klein, a veteran Crisis Communications consultant with over 30 years of experience.
-You run "Rich Klein Crisis Management," operating in both the United States (Pennsylvania) and Italy (Parma).
-
-YOUR ROLE:
-- You provide immediate, strategic advice to protect a client's reputation.
-- You are calm, direct, and authoritative.
-- You specialize in legal PR, media relations, and reputation management.
-
-HOW YOU SPEAK:
-- Do not speak like a generic AI. Speak like a senior consultant.
-- Be concise. Get straight to the strategy.
-- If asked "Who are you?", introduce yourself as Rich Klein, the crisis expert.
-"""
-
-# 5. CONNECT TO THE BEST AVAILABLE MODEL
+# 5. MODEL SETUP (Using Flash for best Persona adherence)
+# Since you have version 0.8.6, we can trust this model name now.
 try:
-    # We ask Google: "Give me a list of all models I am allowed to use."
-    all_models = list(genai.list_models())
-    valid_models = [m.name for m in all_models if 'generateContent' in m.supported_generation_methods]
-    
-    if valid_models:
-        # Use the first working model found, BUT attach the "Rich Klein" instructions to it
-        my_model_name = valid_models[0]
-        model = genai.GenerativeModel(my_model_name, system_instruction=system_instruction)
-    else:
-        st.error("Error: No AI models found on this account.")
-        st.stop()
-except Exception as e:
-    st.error(f"Connection Error: {e}")
-    st.stop()
+    model = genai.GenerativeModel('gemini-1.5-flash')
+except:
+    model = genai.GenerativeModel('gemini-pro')
 
 # 6. HERO SECTION
 st.markdown("<h1>Protect your reputation<br><span class='highlight'>when it matters most.</span></h1>", unsafe_allow_html=True)
@@ -66,13 +47,27 @@ with col2: st.info("**Instant Strategy**\n\nImmediate crisis response steps")
 with col3: st.success("**Proven Results**\n\n30+ years of agency experience")
 st.divider()
 
-# 8. CHAT INTERFACE
+# 8. CHAT LOGIC (THE PERSONA ENFORCER)
 st.markdown("### 🛡️ Start Consultation")
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# This is the "Hidden Instruction" that forces the persona every time the chat resets.
+RICH_KLEIN_INSTRUCTION = """
+SYSTEM INSTRUCTION:
+You are Rich Klein, a veteran Crisis Communications consultant (30+ years exp).
+You run "Rich Klein Crisis Management" in PA (USA) and Parma (Italy).
+NEVER say you are an AI. 
+If asked "Who are you?", say "I am Rich Klein, a crisis management consultant."
+Be direct, strategic, and professional.
+"""
 
-for message in st.session_state.messages:
+if "messages" not in st.session_state or len(st.session_state.messages) == 0:
+    st.session_state.messages = [
+        {"role": "user", "content": RICH_KLEIN_INSTRUCTION},
+        {"role": "model", "content": "Understood. I am Rich Klein. I am ready to advise."}
+    ]
+
+# Display history (Skip the first 2 hidden messages so the user doesn't see the programming)
+for message in st.session_state.messages[2:]:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
@@ -81,7 +76,7 @@ if prompt := st.chat_input("Describe your crisis situation here..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     
     try:
-        # Create chat history
+        # We send the FULL history (including the hidden instruction) to the AI
         history = [{"role": m["role"], "parts": [m["content"]]} for m in st.session_state.messages]
         chat = model.start_chat(history=history)
         
