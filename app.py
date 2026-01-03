@@ -21,31 +21,41 @@ else:
     st.error("Missing API Key.")
     st.stop()
 
-# 4. AUTO-DETECT WORKING MODEL (The "Crash Preventer")
-# We ask Google: "What models do I have?" and use the first one that works.
+# 4. INTELLIGENT MODEL SELECTOR (Prioritize Flash)
 try:
     all_models = list(genai.list_models())
-    # Filter for models that can chat
-    valid_models = [m.name for m in all_models if 'generateContent' in m.supported_generation_methods]
+    # Get all models that can chat
+    chat_models = [m.name for m in all_models if 'generateContent' in m.supported_generation_methods]
     
-    if valid_models:
-        # Pick the first available model (e.g., gemini-1.5-flash-001 or gemini-pro)
-        active_model_name = valid_models[0]
+    # LOGIC: Look for 'flash' first because 'pro' is crashing your account
+    active_model_name = None
+    for name in chat_models:
+        if 'flash' in name:
+            active_model_name = name
+            break
+    
+    # If no flash, just take the first available one
+    if not active_model_name and chat_models:
+        active_model_name = chat_models[0]
+        
+    if active_model_name:
         model = genai.GenerativeModel(active_model_name)
     else:
-        st.error("Critical: Your API Key works, but you have no AI models enabled.")
+        st.error("Critical: No AI models found on this account.")
         st.stop()
+
 except Exception as e:
     st.error(f"Connection Error: {e}")
     st.stop()
 
-# 5. SIDEBAR CONTROLS
+# 5. SIDEBAR
 with st.sidebar:
     st.header("Controls")
     if st.button("🔄 Reset Conversation"):
         st.session_state.messages = []
         st.rerun()
-    st.write(f"**Connected Brain:** `{active_model_name}`")
+    # This will print exactly which brain we are using so we know for sure
+    st.success(f"Connected to: `{active_model_name}`")
 
 # 6. HERO SECTION
 st.markdown("<h1>Protect your reputation<br><span class='highlight'>when it matters most.</span></h1>", unsafe_allow_html=True)
@@ -70,10 +80,11 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# 9. THE SECRET "RICH KLEIN" INSTRUCTION
-# We attach this to the first message silently.
+# 9. THE SECRET WHISPER (Persona Injection)
+# We add this to the FIRST message to force the Rich Klein persona without crashing the model settings.
 PERSONA_INSTRUCTION = """
-INSTRUCTIONS: You are Rich Klein, a Crisis Communications expert (30+ years exp).
+SYSTEM INSTRUCTIONS:
+You are Rich Klein, a Crisis Communications expert (30+ years exp).
 You act as a consultant for 'Rich Klein Crisis Management' in PA and Italy.
 NEVER say you are an AI.
 If asked 'Who are you?', say 'I am Rich Klein, a crisis management consultant.'
@@ -95,7 +106,7 @@ if prompt := st.chat_input("Describe your crisis situation here..."):
             role = m["role"]
             content = m["content"]
             
-            # If it's the very first user message, add the Secret Instruction
+            # If it's the very first user message, glue the instruction to it
             if i == 0 and role == "user":
                 content = PERSONA_INSTRUCTION + content
             
