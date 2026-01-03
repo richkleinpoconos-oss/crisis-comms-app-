@@ -21,33 +21,16 @@ else:
     st.error("Missing API Key.")
     st.stop()
 
-# 4. RESET BUTTON (Fixed Logic)
+# 4. RESET BUTTON (Updated for new Streamlit)
 with st.sidebar:
     st.header("Controls")
     if st.button("🔄 Reset Conversation"):
         st.session_state.messages = []
-        st.experimental_rerun()
+        st.rerun()
 
-# 5. INITIALIZE CHAT HISTORY
-# We inject the "Rich Klein" persona as the very first hidden message.
-# This works on ALL models and does not cause errors.
-initial_prompt = {
-    "role": "user", 
-    "content": """
-    IMPORTANT: You are Rich Klein, a veteran Crisis Communications Consultant (30+ years). 
-    You run 'Rich Klein Crisis Management' in PA and Italy.
-    You are NOT an AI. You are a consultant.
-    If asked 'Who are you?', answer: 'I am Rich Klein, a crisis communications expert.'
-    Keep answers professional, strategic, and concise.
-    """
-}
-
-if "messages" not in st.session_state:
-    st.session_state.messages = [initial_prompt]
-
-# If the user hit "Reset", the list is empty, so we put the prompt back in.
-if len(st.session_state.messages) == 0:
-    st.session_state.messages = [initial_prompt]
+# 5. INITIALIZE MODEL (Using the standard stable model)
+# We won't pass complex instructions here to avoid crashes.
+model = genai.GenerativeModel('gemini-pro')
 
 # 6. HERO SECTION
 st.markdown("<h1>Protect your reputation<br><span class='highlight'>when it matters most.</span></h1>", unsafe_allow_html=True)
@@ -64,39 +47,57 @@ st.divider()
 # 8. CHAT INTERFACE
 st.markdown("### 🛡️ Start Consultation")
 
-# We use a Safety Valve here. We try the new model, if it fails, we use the old one.
-try:
-    model = genai.GenerativeModel('gemini-1.5-flash')
-except:
-    model = genai.GenerativeModel('gemini-pro')
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-# Display History (We skip the first message because it's the hidden instruction)
-for message in st.session_state.messages[1:]:
-    # We only show messages that have content (sometimes the system message is blank)
-    if message.get("role") != "system":
-         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+# Display History
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# 9. THE SECRET INSTRUCTION BLOCK
+# This text is added to your first message but hidden from the UI.
+PERSONA_INSTRUCTION = """
+INSTRUCTIONS: You are Rich Klein, a Crisis Communications expert (30+ years exp).
+You act as a consultant for 'Rich Klein Crisis Management' in PA and Italy.
+NEVER say you are an AI.
+If asked 'Who are you?', say 'I am Rich Klein, a crisis management consultant.'
+Be direct, strategic, and professional.
+--------------------------------------------------
+USER MESSAGE:
+"""
 
 if prompt := st.chat_input("Describe your crisis situation here..."):
-    # Show User Message
+    # 1. Show User Message on screen (Clean version)
     st.chat_message("user").markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
     
     try:
-        # Prepare the conversation history for the AI
-        # We filter the history to ensure it matches what the AI expects
-        history_for_ai = []
-        for m in st.session_state.messages:
-            history_for_ai.append({"role": m["role"], "parts": [m["content"]]})
-
-        chat = model.start_chat(history=history_for_ai)
-        response = chat.send_message(prompt)
+        # 2. Build the "Secret Payload"
+        # If this is the very first message, we attach the instruction to the front of it.
+        # This tricks the AI into adopting the persona immediately.
         
-        # Show AI Response
+        history_for_ai = []
+        
+        # We reconstruct the history for the AI
+        for i, m in enumerate(st.session_state.messages):
+            role = m["role"]
+            content = m["content"]
+            
+            # If it's the first user message, add the instructions
+            if i == 0 and role == "user":
+                content = PERSONA_INSTRUCTION + content
+            
+            history_for_ai.append({"role": role, "parts": [content]})
+
+        # 3. Send to Google
+        chat = model.start_chat(history=history_for_ai[:-1]) # Load history except last msg
+        response = chat.send_message(history_for_ai[-1]["parts"][0]) # Send the modified last msg
+        
+        # 4. Show AI Response
         with st.chat_message("assistant"):
             st.markdown(response.text)
         st.session_state.messages.append({"role": "model", "content": response.text})
         
     except Exception as e:
-        st.error(f"Something went wrong. Please click 'Reset Conversation' and try again.")
-        st.error(f"Technical Error: {e}")
+        st.error(f"Error: {e}")
