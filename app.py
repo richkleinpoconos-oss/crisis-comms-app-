@@ -21,16 +21,31 @@ else:
     st.error("Missing API Key.")
     st.stop()
 
-# 4. RESET BUTTON (Updated for new Streamlit)
+# 4. AUTO-DETECT WORKING MODEL (The "Crash Preventer")
+# We ask Google: "What models do I have?" and use the first one that works.
+try:
+    all_models = list(genai.list_models())
+    # Filter for models that can chat
+    valid_models = [m.name for m in all_models if 'generateContent' in m.supported_generation_methods]
+    
+    if valid_models:
+        # Pick the first available model (e.g., gemini-1.5-flash-001 or gemini-pro)
+        active_model_name = valid_models[0]
+        model = genai.GenerativeModel(active_model_name)
+    else:
+        st.error("Critical: Your API Key works, but you have no AI models enabled.")
+        st.stop()
+except Exception as e:
+    st.error(f"Connection Error: {e}")
+    st.stop()
+
+# 5. SIDEBAR CONTROLS
 with st.sidebar:
     st.header("Controls")
     if st.button("🔄 Reset Conversation"):
         st.session_state.messages = []
         st.rerun()
-
-# 5. INITIALIZE MODEL (Using the standard stable model)
-# We won't pass complex instructions here to avoid crashes.
-model = genai.GenerativeModel('gemini-pro')
+    st.write(f"**Connected Brain:** `{active_model_name}`")
 
 # 6. HERO SECTION
 st.markdown("<h1>Protect your reputation<br><span class='highlight'>when it matters most.</span></h1>", unsafe_allow_html=True)
@@ -55,8 +70,8 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# 9. THE SECRET INSTRUCTION BLOCK
-# This text is added to your first message but hidden from the UI.
+# 9. THE SECRET "RICH KLEIN" INSTRUCTION
+# We attach this to the first message silently.
 PERSONA_INSTRUCTION = """
 INSTRUCTIONS: You are Rich Klein, a Crisis Communications expert (30+ years exp).
 You act as a consultant for 'Rich Klein Crisis Management' in PA and Italy.
@@ -68,33 +83,29 @@ USER MESSAGE:
 """
 
 if prompt := st.chat_input("Describe your crisis situation here..."):
-    # 1. Show User Message on screen (Clean version)
+    # Show User Message
     st.chat_message("user").markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
     
     try:
-        # 2. Build the "Secret Payload"
-        # If this is the very first message, we attach the instruction to the front of it.
-        # This tricks the AI into adopting the persona immediately.
-        
+        # Build History for AI
         history_for_ai = []
         
-        # We reconstruct the history for the AI
         for i, m in enumerate(st.session_state.messages):
             role = m["role"]
             content = m["content"]
             
-            # If it's the first user message, add the instructions
+            # If it's the very first user message, add the Secret Instruction
             if i == 0 and role == "user":
                 content = PERSONA_INSTRUCTION + content
             
             history_for_ai.append({"role": role, "parts": [content]})
 
-        # 3. Send to Google
-        chat = model.start_chat(history=history_for_ai[:-1]) # Load history except last msg
-        response = chat.send_message(history_for_ai[-1]["parts"][0]) # Send the modified last msg
+        # Send to the Auto-Detected Model
+        chat = model.start_chat(history=history_for_ai[:-1])
+        response = chat.send_message(history_for_ai[-1]["parts"][0])
         
-        # 4. Show AI Response
+        # Show AI Response
         with st.chat_message("assistant"):
             st.markdown(response.text)
         st.session_state.messages.append({"role": "model", "content": response.text})
